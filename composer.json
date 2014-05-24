@@ -1,0 +1,29 @@
+{
+    "name": "ivixlabs/SyncDaemon",
+    "description": "SyncDaemon used for synchronize code for php",
+    "keywords": ["SyncDaemon", "synchronized code", "php"],
+    "homepage": "https://github.com/ivixlabs/SyncDaemon",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Ivan Ruder",
+            "email": "ivixlabs@gmail.com",
+            "homepage": "http://ivixlabs.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.3.0",
+        "react/react": "0.5.*@dev"
+    },
+    "require-dev": {
+    },
+    "suggest": {
+
+    },
+    "autoload": {
+        "psr-4": {
+            "SyncDaemon\\": "src/SyncDaemon"
+        }
+    }
+}

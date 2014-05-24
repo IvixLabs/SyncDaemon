@@ -47,6 +47,10 @@ class Lock
         }
     }
 
+    /**
+     * Release lock object
+     * @return bool
+     */
     public function free()
     {
         return self::release($this->name);

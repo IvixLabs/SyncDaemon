@@ -1,5 +1,5 @@
 {
-    "name": "ivixlabs/SyncDaemon",
+    "name": "ivixlabs/sync-daemon",
     "type": "library",
     "description": "SyncDaemon used for synchronize code for php",
     "keywords": ["SyncDaemon", "synchronized code", "php"],

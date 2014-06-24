@@ -1,5 +1,5 @@
 <?php
-namespace SyncDaemon;
+namespace IvixLabs\SyncDaemon;
 
 
 use React;

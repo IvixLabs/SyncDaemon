@@ -57,6 +57,7 @@ class SyncDaemonClient
 
     private function sendRequest($command, $name, $noWait = false)
     {
+        $name = md5($name);
         $this->checkInit();
         $result = fwrite($this->connection, "$command $name\n");
         if ($result === false) {

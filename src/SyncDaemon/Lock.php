@@ -27,7 +27,6 @@ class Lock
 
     static public function acquire($name, $noWait = false)
     {
-        $name = md5($name);
         self::checkInit();
         if (self::$syncDaemonClient->acquire($name, $noWait)) {
             return new Lock($name);
@@ -37,7 +36,6 @@ class Lock
 
     static public function release($name)
     {
-        $name = md5($name);
         self::checkInit();
         return self::$syncDaemonClient->release($name);
     }

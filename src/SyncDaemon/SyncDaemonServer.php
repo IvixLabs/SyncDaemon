@@ -1,16 +1,26 @@
 <?php
 namespace IvixLabs\SyncDaemon;
 
-
 use React;
 
 class SyncDaemonServer
 {
+    const ACCEPT = "accept\n";
+    const ACQUIRE = 'acquire';
+    const RELEASE = 'release';
 
     private $host = '127.0.0.1';
     private $port = 1337;
     private $locks = array();
     private $connections;
+
+    const SUCCESS = "success\n";
+    const WAIT = "wait\n";
+
+    const CONNECTION = 'connection';
+    const DATA = 'data';
+
+    const CLOSE = 'close';
 
     function __construct($host = '127.0.0.1', $port = 1337)
     {
@@ -26,25 +36,25 @@ class SyncDaemonServer
 
         $server = $this;
 
-        $socket->on('connection', function (React\Socket\Connection $connection) use (&$server) {
+        $socket->on(self::CONNECTION, function (React\Socket\Connection $connection) use (&$server) {
             $server->connectionEvent($connection);
 
-            $connection->on('data', function ($data) use (&$connection, &$server) {
+            $connection->on(SyncDaemonServer::DATA, function ($data) use (&$connection, &$server) {
                 list($command, $name) = explode(' ', $data);
 
-                if ($command == 'acquire') {
+                if ($command == SyncDaemonServer::ACQUIRE) {
                     $server->acquireCommand($connection, $name);
                 }
-                if ($command == 'release') {
+                if ($command == SyncDaemonServer::RELEASE) {
                     $server->releaseCommand($connection, $name);
                 }
             });
 
-            $connection->on('close', function () use (&$connection, &$server) {
+            $connection->on(SyncDaemonServer::CLOSE, function () use (&$connection, &$server) {
                 $server->closeEvent($connection);
             });
 
-            $connection->write("accept\n");
+            $connection->write(SyncDaemonServer::ACCEPT);
         });
 
         //debug
@@ -61,10 +71,10 @@ class SyncDaemonServer
         if (isset($this->locks[$name])) {
             if (isset($this->connections[$connection][$name])) {
                 if ($this->connections[$connection][$name]) {
-                    $connection->write("success\n");
+                    $connection->write(self::SUCCESS);
                     return;
                 } else {
-                    $connection->write("wait\n");
+                    $connection->write(self::WAIT);
                     return;
                 }
             } else {
@@ -72,7 +82,7 @@ class SyncDaemonServer
                 $connectionLocks = $this->connections[$connection];
                 $connectionLocks[$name] = false;
                 $this->connections[$connection] = $connectionLocks;
-                $connection->write("wait\n");
+                $connection->write(self::WAIT);
                 return;
             }
         } else {
@@ -81,7 +91,7 @@ class SyncDaemonServer
             $connectionLocks = $this->connections[$connection];
             $connectionLocks[$name] = true;
             $this->connections[$connection] = $connectionLocks;
-            $connection->write("success\n");
+            $connection->write(self::SUCCESS);
             return;
         }
     }
@@ -89,48 +99,49 @@ class SyncDaemonServer
     private function releaseCommand(React\Socket\Connection $connection, $name, $sendAnswer = true)
     {
         if (isset($this->locks[$name])) {
-            $index = false;
-            foreach ($this->locks[$name] as $key => $localConnection) {
-                if ($localConnection == $connection) {
-                    $index = $key;
-                    break;
-                }
+            $connection = $this->locks[$name]->shift();
+            $connectionLocks = $this->connections[$connection];
+            if (isset($connectionLocks[$name])) {
+                unset($connectionLocks[$name]);
+                $this->connections[$connection] = $connectionLocks;
             }
 
-            if ($index !== false) {
+            if (count($this->locks[$name]) === 0) {
+                unset($this->locks[$name]);
+            } else {
+                $connection->write(self::SUCCESS);
 
-                unset($this->locks[$name][$index]);
-
-                $connectionLocks = $this->connections[$connection];
-                if (isset($connectionLocks[$name])) {
-                    unset($connectionLocks[$name]);
-                    $this->connections[$connection] = $connectionLocks;
-                }
-
-                if (count($this->locks[$name]) === 0) {
-                    unset($this->locks[$name]);
-                } else {
-                    if ($index === 0) {
-                        $connection->write("success\n");
-
-                        $firstInQueueConnection = $this->locks[$name][0];
+                /** @var $firstInQueueConnection React\Socket\Connection */
+                while (($firstInQueueConnection = $this->locks[$name][0]) !== null) {
+                    if (isset($this->connections[$firstInQueueConnection])) {
                         $connectionLocks = $this->connections[$firstInQueueConnection];
                         $connectionLocks[$name] = true;
                         $this->connections[$firstInQueueConnection] = $connectionLocks;
-                        $firstInQueueConnection->write("success\n");
+                        $firstInQueueConnection->write(self::SUCCESS);
                         return;
+                    } else {
+                        $this->locks[$name]->shift();
                     }
                 }
+                return;
             }
         }
 
-        $connection->write("success\n");
+        $connection->write(self::SUCCESS);
     }
 
     private function closeEvent(React\Socket\Connection $connection)
     {
         foreach ($this->connections[$connection] as $lockName => $acquired) {
-            $this->releaseCommand($connection, $lockName, false);
+            foreach ($this->locks[$lockName] as $index => $localConn) {
+                if ($localConn == $connection) {
+                    if ($index == 0) {
+                        $this->releaseCommand($connection, $lockName, false);
+                    } else {
+                        unset($this->locks[$lockName][$index]);
+                    }
+                }
+            }
         }
         unset($this->connections[$connection]);
     }

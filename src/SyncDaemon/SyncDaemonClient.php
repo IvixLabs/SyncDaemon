@@ -8,6 +8,11 @@ class SyncDaemonClient
 
     private $host;
     private $port;
+    const ACCEPT = 'accept';
+    const ACQUIRE = 'acquire';
+    const RELEASE = 'release';
+    const WAIT = 'wait';
+    const SUCCESS = 'success';
 
     /**
      * @var React\Socket\Connection
@@ -23,12 +28,14 @@ class SyncDaemonClient
     private function init()
     {
         $connection = @stream_socket_client('tcp://' . $this->host . ':' . $this->port);
+        stream_set_write_buffer($connection, 0);
+        stream_set_read_buffer($connection, 0);
         if (!$connection) {
             throw new \Exception('No SyncDaemon available.');
         }
 
         $data = trim(fgets($connection));
-        if ($data != 'accept') {
+        if ($data != self::ACCEPT) {
             throw new \Exception('Connection faild. Wrong answer: ' . $data);
         }
         $this->connection = $connection;
@@ -47,12 +54,12 @@ class SyncDaemonClient
 
     public function acquire($name, $noWait = false)
     {
-        return $this->sendRequest('acquire', $name, $noWait);
+        return $this->sendRequest(self::ACQUIRE, $name, $noWait);
     }
 
     public function release($name)
     {
-        return $this->sendRequest('release', $name);
+        return $this->sendRequest(self::RELEASE, $name);
     }
 
     private function sendRequest($command, $name, $noWait = false)
@@ -68,10 +75,10 @@ class SyncDaemonClient
             if ($data == '') {
                 throw new \Exception('Lost SyncDaemon');
             }
-            if ($noWait && $data == 'wait') {
+            if ($noWait && $data == self::WAIT) {
                 return false;
             }
-        } while ($data != 'success');
+        } while ($data != self::SUCCESS);
 
         return true;
     }
